@@ -1,0 +1,136 @@
+import seaborn as sns
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from sklearn.metrics import classification_report,confusion_matrix
+import numpy as np
+
+img_size=(180,180)
+batch_size=32
+train=tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size,batch_size=batch_size)
+test=tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size,batch_size=batch_size)
+class_names=train.class_names
+
+model=tf.keras.models.Sequential([
+    tf.keras.layers.Rescaling(1./255),
+    tf.keras.layers.Conv2D(32,2,activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Conv2D(64,2,activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(len(class_names))
+
+])
+model.compile(optimizer='adam',loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'] )
+model.fit(train,epochs=1)
+model.summary()
+
+ytrue=[]
+ypre=[]
+for image,label in test:
+    pre=model.predict(image)
+    ytrue.extend(label.numpy())
+    ypre.extend(np.argmax(pre,axis=1))
+
+print(classification_report(ytrue,ypre,target_names=class_names))
+cn=confusion_matrix(ytrue,ypre)
+plt.figure(figsize=(10,5))
+sns.heatmap(cn,annot=True,fmt='d',cmap='Blues',xticklabels=class_names,yticklabels=class_names)
+plt.show()
+
+model.save('image_model.kers')
+
+while True:
+    img=input("edit image directory").strip()
+    img=tf.keras.preprocessing.image.load_img(img,target_size=img_size)
+    img_array=tf.keras.preprocessing.image.img_to_array(img)
+    img_array=tf.expand_dims(img_array,0)
+    pred=model.predict(img_array)
+    print("predicted class",class_names(np.argmax(tf.nn.softmax(pred[0]))))
+......................
+import pandas as pd
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+from collections import Counter
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import nltk
+import string
+
+nltk.download('stopwords')
+from nltk.corpus import stopwords
+
+stop_words = set(stopwords.words('english'))
+
+df = pd.read_csv(r"D:\data scince model lab\archive (3) (1)\spam.csv", encoding='latin-1')
+df = df[['v1', 'v2']]
+df.columns = ['label', 'message']
+
+def clean_text(text):
+    text = str(text).lower()
+    text = ''.join(c for c in text if c not in string.punctuation)
+    words = text.split()
+    filtered = [word for word in words if word not in stop_words]
+    return ' '.join(filtered)
+
+df['clean_message'] = df['message'].apply(clean_text)
+
+
+for label in ['spam', 'ham']:
+    print(f"\n🔍 Analyzing messages labeled: {label.upper()}")
+    messages = df[df['label'] == label]['clean_message'].dropna()
+    all_words = ' '.join(messages).split()
+    word_freq = Counter(all_words)
+    top_words = word_freq.most_common(10)
+
+    for word, count in top_words:
+        print(f"{word}: {count}")
+
+    labels_, values = zip(*top_words)
+    plt.figure(figsize=(10, 6))
+    plt.barh(labels_, values, color='salmon' if label == 'spam' else 'skyblue')
+    plt.xlabel("Frequency")
+    plt.title(f"Top Words in {label.upper()} Messages")
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+    plt.show()
+
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(word_freq)
+    plt.figure(figsize=(12, 6))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.title(f"Word Cloud for {label.upper()} Messages")
+    plt.tight_layout()
+    plt.show()
+
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(df['clean_message'].fillna(''))
+y = df['label'].map({'ham': 0, 'spam': 1})
+
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+
+y_pred = model.predict(X_test)
+print("\n Classification Report:")
+print(classification_report(y_test, y_pred))
+print("\n Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print("\n Accuracy Score:", accuracy_score(y_test, y_pred))
+
+
+def predict_message(sample_text):
+    cleaned = clean_text(sample_text)
+    vectorized = vectorizer.transform([cleaned])
+    prediction = model.predict(vectorized)[0]
+    label = 'SPAM' if prediction == 1 else 'HAM'
+    print(f"\n Sample Message: {sample_text}")
+    print(f" Prediction: {label}")
+
+predict_message("Congratulations! You have won a $1000 Walmart gift card. Click here to claim.")
+predict_message("Hey, can we meet tomorrow at the usual place?")
