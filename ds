@@ -143,3 +143,48 @@ def predict_message(sample_text):
 
 predict_message("Congratulations! You have won a $1000 Walmart gift card. Click here to claim.")
 predict_message("Hey, can we meet tomorrow at the usual place?")
+.......................
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+
+df = pd.read_csv(r"archive (3) (1)//spam.csv")
+
+text_columns = ['v1','v2']
+
+def clean_phrase(text):
+    text = str(text).strip()
+    if not text or text.isspace():
+        return None
+    return ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+
+for col in text_columns:
+    print(f"\n🔍 Analyzing column: {col}")
+
+    phrases = df[col].dropna().apply(clean_phrase)
+    phrases = phrases[phrases.notnull()]
+
+    phrase_counts = phrases.value_counts()
+    top_phrases = phrase_counts.head(10)
+    print(top_phrases)
+
+ 
+    labels, values = top_phrases.index.tolist(), top_phrases.values.tolist()
+    plt.figure(figsize=(10, 6))
+    plt.barh(labels, values, color='mediumseagreen')
+    plt.xlabel("Frequency")
+    plt.ylabel("Phrases")
+    plt.title(f"Top Phrases in '{col}'")
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+    plt.show()
+
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(phrase_counts.to_dict())
+    plt.figure(figsize=(12, 6))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.title(f"Word Cloud of '{col}'")
+    plt.tight_layout()
+    plt.show()
+
