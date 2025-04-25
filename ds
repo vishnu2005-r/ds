@@ -1,51 +1,60 @@
-import seaborn as sns
-import matplotlib.pyplot as plt
 import tensorflow as tf
-from sklearn.metrics import classification_report,confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 
-img_size=(180,180)
-batch_size=32
-train=tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size,batch_size=batch_size)
-test=tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size,batch_size=batch_size)
-class_names=train.class_names
+img_size = (180, 180)
+batch_size = 32
 
-model=tf.keras.models.Sequential([
+train = tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size, batch_size=batch_size)
+test = tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size,batch_size=batch_size)
+class_names = train.class_names
+model = tf.keras.models.Sequential([
     tf.keras.layers.Rescaling(1./255),
-    tf.keras.layers.Conv2D(32,2,activation='relu'),
+    tf.keras.layers.Conv2D(32, 2, activation='relu'),
     tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Conv2D(64,2,activation='relu'),
+    tf.keras.layers.Conv2D(64, 2, activation='relu'),
     tf.keras.layers.MaxPooling2D(),
     tf.keras.layers.Flatten(),
     tf.keras.layers.Dense(len(class_names))
-
 ])
-model.compile(optimizer='adam',loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'] )
-model.fit(train,epochs=1)
+
+model.compile(optimizer='adam',loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
+
+model.fit(train, epochs=3)
+
 model.summary()
 
-ytrue=[]
-ypre=[]
-for image,label in test:
-    pre=model.predict(image)
-    ytrue.extend(label.numpy())
-    ypre.extend(np.argmax(pre,axis=1))
 
-print(classification_report(ytrue,ypre,target_names=class_names))
-cn=confusion_matrix(ytrue,ypre)
-plt.figure(figsize=(10,5))
-sns.heatmap(cn,annot=True,fmt='d',cmap='Blues',xticklabels=class_names,yticklabels=class_names)
+y_true = []
+y_pred = []
+
+for image, label in test:
+    pre = model.predict(image)
+    y_true.extend(label.numpy())
+    y_pred.extend(np.argmax(pre, axis=1))
+
+print(classification_report(y_true, y_pred, target_names=class_names))
+
+cm = confusion_matrix(y_true, y_pred)
+
+plt.figure(figsize=(10, 5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',xticklabels=class_names, yticklabels=class_names)
 plt.show()
 
-model.save('image_model.kers')
+
+model.save('image_model.keras')
 
 while True:
-    img=input("edit image directory").strip()
-    img=tf.keras.preprocessing.image.load_img(img,target_size=img_size)
-    img_array=tf.keras.preprocessing.image.img_to_array(img)
-    img_array=tf.expand_dims(img_array,0)
-    pred=model.predict(img_array)
-    print("predicted class",class_names(np.argmax(tf.nn.softmax(pred[0]))))
+    img = input("Enter image path: ").strip()
+    img = tf.keras.preprocessing.image.load_img(img, target_size=img_size)
+    img_array = tf.keras.preprocessing.image.img_to_array(img)
+    img_array = tf.expand_dims(img_array, 0)
+    pred = model.predict(img_array)
+    print("Predicted Class:", class_names[np.argmax(tf.nn.softmax(pred[0]))])
+
+
 ......................
 import pandas as pd
 import matplotlib.pyplot as plt
