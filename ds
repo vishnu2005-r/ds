@@ -1,190 +1,269 @@
-import tensorflow as tf
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
+from sklearn.preprocessing import LabelEncoder,StandardScaler,MinMaxScaler
 
-img_size = (180, 180)
-batch_size = 32
+df=pd.read_csv(r"D:\data scince model lab\processed_doge_dataset.csv")
 
-train = tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size, batch_size=batch_size)
-test = tf.keras.utils.image_dataset_from_directory(r"archive (2) (1)",image_size=img_size,batch_size=batch_size)
-class_names = train.class_names
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Rescaling(1./255),
-    tf.keras.layers.Conv2D(32, 2, activation='relu'),
-    tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Conv2D(64, 2, activation='relu'),
-    tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(len(class_names))
-])
+print(df.isnull().dropna())
+print(df.duplicated().dropna())
 
-model.compile(optimizer='adam',loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
+print(df.info())
 
-model.fit(train, epochs=3)
+df['Date']=pd.to_datetime(df['Date'])
+print(df.info())
 
-model.summary()
+label=LabelEncoder()
+for col in df.columns:
+    if df[col].dtype=='Object':
+        df[col]=label.fit_transform(df[col])
 
 
-y_true = []
-y_pred = []
+a=df.select_dtypes(include=['number'])
 
-for image, label in test:
-    pre = model.predict(image)
-    y_true.extend(label.numpy())
-    y_pred.extend(np.argmax(pre, axis=1))
+scale=StandardScaler()
+ab=scale.fit_transform(a)
+print(ab[:5])
 
-print(classification_report(y_true, y_pred, target_names=class_names))
+a.hist()
+plt.show()
 
-cm = confusion_matrix(y_true, y_pred)
+minmax=MinMaxScaler()
+de=minmax.fit_transform(a)
 
-plt.figure(figsize=(10, 5))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',xticklabels=class_names, yticklabels=class_names)
+print(de[:5])
+
+plt.figure(figsize=(10,8))
+sns.lineplot(x=df['Date'],y=df['Close'],data=a)
+plt.show()
+
+sns.heatmap(data=a.cov(),annot=True,cmap='coolwarm',fmt='.2f')
+plt.show()
+
+#.........
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import mean_absolute_error,mean_squared_error,r2_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler,LabelEncoder
+from sklearn.linear_model import LinearRegression
+
+df=pd.read_csv(r"D:\data scince model lab\processed_doge_dataset.csv")
+
+a=df.select_dtypes(include=['number'])
+
+label=LabelEncoder()
+for col in df.columns:
+    if df[col].dtype=='object':
+        df[col]=label.fit_transform(df[col])
+
+x=df.drop(['Date','Close'],axis=1)
+y=df['Close']
+
+m=StandardScaler()
+xp=m.fit_transform(x)
+
+X_train,x_test,y_train,y_test=train_test_split(xp,y,test_size=0.2,random_state=42)
+
+model=LinearRegression()
+model.fit(X_train,y_train)
+
+yp=model.predict(x_test)
+
+print(mean_absolute_error(yp,y_test))
+#....................
+import pandas as pd
+import numpy as np
+from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score, davies_bouldin_score
+import matplotlib.pyplot as plt
+from kneed import KneeLocator
+
+df = pd.read_csv(r'D:\data scince model lab\processed_doge_dataset.csv')
+
+df_numeric = df.select_dtypes(include=['number'])
+
+wcss = []
+K = range(1, 11)
+
+for k in K:
+    kmeans = KMeans(n_clusters=k)
+    kmeans.fit(df_numeric)
+    wcss.append(kmeans.inertia_)
+knee = KneeLocator(K, wcss, curve='convex',direction='decreasing')
+optimal_k = knee.knee
+
+plt.plot(K, wcss, 'bo-')
+plt.axvline(optimal_k, color='red', linestyle='--', label=f'Optimal k = {optimal_k}')
+plt.title("Elbow Method for Optimal K")
+plt.xlabel("Number of Clusters (k)")
+plt.ylabel("Within-Cluster Sum of Squares (WCSS)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print(f"Optimal number of clusters: {optimal_k}")
+
+kmeans = KMeans(n_clusters=optimal_k)
+labels_kmeans = kmeans.fit_predict(df_numeric)
+
+
+agglo = AgglomerativeClustering(n_clusters=optimal_k)
+labels_agglo = agglo.fit_predict(df_numeric)
+
+
+x_pca = PCA(n_components=2).fit_transform(df_numeric)
+
+
+plt.figure(figsize=(8, 5))
+scatter1 = plt.scatter(x_pca[:, 0], x_pca[:, 1], c=labels_kmeans)
+plt.title(f'KMeans Clustering (k={optimal_k})')
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.legend(*scatter1.legend_elements(), title="Cluster")
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(8, 5))
+scatter2 = plt.scatter(x_pca[:, 0], x_pca[:, 1], c=labels_agglo, cmap='coolwarm', s=50)
+plt.title('Agglomerative Clustering')
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.legend(*scatter2.legend_elements(), title="Cluster")
+plt.grid(True)
 plt.show()
 
 
-model.save('image_model.keras')
+sil_kmeans = silhouette_score(df_numeric, labels_kmeans)
+dbi_kmeans = davies_bouldin_score(df_numeric, labels_kmeans)
+
+sil_agglo = silhouette_score(df_numeric, labels_agglo)
+dbi_agglo = davies_bouldin_score(df_numeric, labels_agglo)
+
+print(f"\n--- Evaluation Metrics ---")
+print(f"KMeans: Silhouette Score = {sil_kmeans:.4f}, Davies-Bouldin Index = {dbi_kmeans:.4f}")
+print(f"Agglomerative: Silhouette Score = {sil_agglo:.4f}, Davies-Bouldin Index = {dbi_agglo:.4f}")
+
+............................
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+df=pd.read_csv(r"D:\\data scince model lab\\processed_doge_dataset.csv")
+df['Date']=pd.to_datetime(df['Date'])
+df=df.sort_values('Date')
+df.set_index('Date',inplace=True)
+
+plt.figure(figsize=(12,10))
+plt.plot(df['Close'],label='actual values',color='blue')
+plt.title("trend")
+plt.xlabel('date')
+plt.ylabel('cloe values')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+df['RollingMean']=df['Close'].rolling(window=32).mean()
+
+plt.figure(figsize=(12,10))
+plt.plot(df['Close'],label='actual values',color='blue')
+plt.plot(df['RollingMean'],label='30 day rolling',color='pink')
+plt.title("trend")
+plt.xlabel('date')
+plt.ylabel('cloe values')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+a=df['Close'].resample('W').mean()
+d=seasonal_decompose(a,model='additive',period=32)
+
+plt.figure(figsize=(12,8))
+plt.subplot(411)
+plt.plot(d.observed,label='obderved',color='pink')
+
+plt.figure(figsize=(12,8))
+plt.subplot(412)
+plt.plot(d.resid,label='resid',color='pink')
+
+plt.figure(figsize=(12,8))
+plt.subplot(413)
+plt.plot(d.seasonal,label='seasonal',color='pink')
+
+plt.figure(figsize=(12,8))
+plt.subplot(414)
+plt.plot(d.trend,label='trnd',color='pink')
+
+plt.tight_layout()
+plt.show()
+
+tf=a.dropna()
+model=SARIMAX(tf,order=(1,1,1),seasonal_order=(1,1,1,52))
+model_fit=model.fit()
+print(model_fit.summary())
+
+forcast_steps=20
+forcast=model_fit.forecast(steps=forcast_steps)
+
+plt.figure(figsize=(12,10))
+plt.plot(tf,label='observed',color='blue')
+plt.plot(forcast.index,forcast,label='20 weeks ',color='pink')
+plt.title("trend")
+plt.xlabel('date')
+plt.ylabel('cloe values')
+plt.legend()
+plt.grid(True)
+plt.show()
+.................
+import tensorflow as tf
+from sklearn.metrics import classification_report,confusion_matrix
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+image_size=(180,180)
+batch_size=32
+train=tf.keras.utils.image_dataset_from_directory(r"D:\\data scince model lab\\archive (2) (1)",image_size=image_size,batch_size=batch_size)
+test=tf.keras.utils.image_dataset_from_directory(r"D:\\data scince model lab\\archive (2) (1)",image_size=image_size,batch_size=batch_size)
+class_names=train.class_names
+
+model=tf.keras.models.Sequential([
+     tf.keras.layers.Rescaling(1./255),
+     tf.keras.layers.Conv2D(32,2,activation='relu'),
+     tf.keras.layers.MaxPooling2D(),
+     tf.keras.layers.Conv2D(64,2,activation='relu'),
+     tf.keras.layers.MaxPooling2D(),
+     tf.keras.layers.Flatten(),
+     tf.keras.layers.Dense(len(class_names))
+])
+
+model.compile(optimizer='adam',loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
+model.fit(train,epochs=1)
+model.summary()
+
+y_true=[]
+y_pred=[]
+
+for image,label in test:
+    pre=model.predict(image)
+    y_true.extend(label.numpy())
+    y_pred.extend(np.argmax(pre,axis=1))
+
+model.save('Image.keras') 
+
+print("classification report",classification_report(y_true,y_pred,target_names=class_names))
+print("confusion matrix",confusion_matrix(y_pred,y_true))
 
 while True:
-    img = input("Enter image path: ").strip()
-    img = tf.keras.preprocessing.image.load_img(img, target_size=img_size)
-    img_array = tf.keras.preprocessing.image.img_to_array(img)
-    img_array = tf.expand_dims(img_array, 0)
-    pred = model.predict(img_array)
-    print("Predicted Class:", class_names[np.argmax(tf.nn.softmax(pred[0]))])
-
-
-......................
-import pandas as pd
-import matplotlib.pyplot as plt
-from wordcloud import WordCloud
-from collections import Counter
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-import nltk
-import string
-
-nltk.download('stopwords')
-from nltk.corpus import stopwords
-
-stop_words = set(stopwords.words('english'))
-
-df = pd.read_csv(r"D:\data scince model lab\archive (3) (1)\spam.csv", encoding='latin-1')
-df = df[['v1', 'v2']]
-df.columns = ['label', 'message']
-
-def clean_text(text):
-    text = str(text).lower()
-    text = ''.join(c for c in text if c not in string.punctuation)
-    words = text.split()
-    filtered = [word for word in words if word not in stop_words]
-    return ' '.join(filtered)
-
-df['clean_message'] = df['message'].apply(clean_text)
-
-
-for label in ['spam', 'ham']:
-    print(f"\n🔍 Analyzing messages labeled: {label.upper()}")
-    messages = df[df['label'] == label]['clean_message'].dropna()
-    all_words = ' '.join(messages).split()
-    word_freq = Counter(all_words)
-    top_words = word_freq.most_common(10)
-
-    for word, count in top_words:
-        print(f"{word}: {count}")
-
-    labels_, values = zip(*top_words)
-    plt.figure(figsize=(10, 6))
-    plt.barh(labels_, values, color='salmon' if label == 'spam' else 'skyblue')
-    plt.xlabel("Frequency")
-    plt.title(f"Top Words in {label.upper()} Messages")
-    plt.gca().invert_yaxis()
-    plt.tight_layout()
-    plt.show()
-
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(word_freq)
-    plt.figure(figsize=(12, 6))
-    plt.imshow(wordcloud, interpolation='bilinear')
-    plt.axis('off')
-    plt.title(f"Word Cloud for {label.upper()} Messages")
-    plt.tight_layout()
-    plt.show()
-
-vectorizer = CountVectorizer()
-X = vectorizer.fit_transform(df['clean_message'].fillna(''))
-y = df['label'].map({'ham': 0, 'spam': 1})
-
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-
-model = MultinomialNB()
-model.fit(X_train, y_train)
-
-
-y_pred = model.predict(X_test)
-print("\n Classification Report:")
-print(classification_report(y_test, y_pred))
-print("\n Confusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
-print("\n Accuracy Score:", accuracy_score(y_test, y_pred))
-
-
-def predict_message(sample_text):
-    cleaned = clean_text(sample_text)
-    vectorized = vectorizer.transform([cleaned])
-    prediction = model.predict(vectorized)[0]
-    label = 'SPAM' if prediction == 1 else 'HAM'
-    print(f"\n Sample Message: {sample_text}")
-    print(f" Prediction: {label}")
-
-predict_message("Congratulations! You have won a $1000 Walmart gift card. Click here to claim.")
-predict_message("Hey, can we meet tomorrow at the usual place?")
-.......................
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from wordcloud import WordCloud
-
-df = pd.read_csv(r"archive (3) (1)//spam.csv")
-
-text_columns = ['v1','v2']
-
-def clean_phrase(text):
-    text = str(text).strip()
-    if not text or text.isspace():
-        return None
-    return ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
-
-for col in text_columns:
-    print(f"\n🔍 Analyzing column: {col}")
-
-    phrases = df[col].dropna().apply(clean_phrase)
-    phrases = phrases[phrases.notnull()]
-
-    phrase_counts = phrases.value_counts()
-    top_phrases = phrase_counts.head(10)
-    print(top_phrases)
-
- 
-    labels, values = top_phrases.index.tolist(), top_phrases.values.tolist()
-    plt.figure(figsize=(10, 6))
-    plt.barh(labels, values, color='mediumseagreen')
-    plt.xlabel("Frequency")
-    plt.ylabel("Phrases")
-    plt.title(f"Top Phrases in '{col}'")
-    plt.gca().invert_yaxis()
-    plt.tight_layout()
-    plt.show()
-
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(phrase_counts.to_dict())
-    plt.figure(figsize=(12, 6))
-    plt.imshow(wordcloud, interpolation='bilinear')
-    plt.axis('off')
-    plt.title(f"Word Cloud of '{col}'")
-    plt.tight_layout()
-    plt.show()
-
+   img=input("enter path :").strip()
+   img=tf.keras.preprocessing.image.load_img(img,target_size=image_size)
+   imgarry=tf.keras.preprocessing.image.img_to_array(img)
+   imgarry=tf.expand_dims(imgarry,0)
+   pred=model.predict(imgarry)
+   print("predicted class:",class_names[np.argmax(tf.nn.softmax(pred[0]))])
+  
